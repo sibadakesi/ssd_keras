@@ -26,7 +26,7 @@ img_width = 300
 K.clear_session() # Clear previous models from memory.
 
 model = ssd_300(image_size=(img_height, img_width, 3),
-                n_classes=20,
+                n_classes=1,
                 mode='inference',
                 l2_regularization=0.0005,
                 scales=[0.1, 0.2, 0.37, 0.54, 0.71, 0.88, 1.05], # The scales for MS COCO are [0.07, 0.15, 0.33, 0.51, 0.69, 0.87, 1.05]
@@ -52,7 +52,7 @@ model = ssd_300(image_size=(img_height, img_width, 3),
 # 2: Load the trained weights into the model.
 
 # TODO: Set the path of the trained weights.
-weights_path = 'train_model/ssd300_pig_epoch-85_loss-16.8562_val_loss-11.6644.h5'
+weights_path = 'train_model/ssd300_pig_epoch-24_loss-4.8124_val_loss-3.5095.h5'
 
 model.load_weights(weights_path, by_name=True)
 
@@ -69,7 +69,7 @@ orig_images = [] # Store the images here.
 input_images = [] # Store resized versions of the images here.
 
 # We'll only load one image in this example.
-img_path = 'labeled/1611717205054.png'
+img_path = '/media/xiong/19e5b012-b28b-4bc5-8a21-2a0237fec899/workspace/about_pig/img/25-26-27/1611822086205.png'
 
 orig_images.append(imread(img_path))
 img = image.load_img(img_path, target_size=(img_height, img_width))
@@ -80,7 +80,7 @@ input_images = np.array(input_images)
 
 y_pred = model.predict(input_images)
 
-confidence_threshold = 0.5
+confidence_threshold = 0.1
 
 y_pred_thresh = [y_pred[k][y_pred[k,:,1] > confidence_threshold] for k in range(y_pred.shape[0])]
 

@@ -1,3 +1,5 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 from keras.optimizers import Adam, SGD
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler, TerminateOnNaN, CSVLogger
 from keras import backend as K
@@ -5,6 +7,7 @@ from keras.models import load_model
 from math import ceil
 import numpy as np
 from matplotlib import pyplot as plt
+import h5py
 
 from models.keras_ssd300 import ssd_300
 from keras_loss_function.keras_ssd_loss import SSDLoss
@@ -12,6 +15,7 @@ from keras_layers.keras_layer_AnchorBoxes import AnchorBoxes
 from keras_layers.keras_layer_DecodeDetections import DecodeDetections
 from keras_layers.keras_layer_DecodeDetectionsFast import DecodeDetectionsFast
 from keras_layers.keras_layer_L2Normalization import L2Normalization
+from keras.engine import topology
 
 from ssd_encoder_decoder.ssd_input_encoder import SSDInputEncoder
 from ssd_encoder_decoder.ssd_output_decoder import decode_detections, decode_detections_fast
@@ -23,11 +27,13 @@ from data_generator.data_augmentation_chain_original_ssd import SSDDataAugmentat
 from data_generator.object_detection_2d_misc_utils import apply_inverse_transforms
 
 
+
 def lr_schedule(epoch):
-    if epoch < 80:
+    if epoch < 30:
         return 0.0001
-    elif epoch < 100:
+    else:
         return 0.00005
+
 
 
 img_height = 300  # Height of the model input images
@@ -37,7 +43,7 @@ mean_color = [123, 117,
               104]  # The per-channel mean of the images in the dataset. Do not change this value if you're using any of the pre-trained weights.
 swap_channels = [2, 1,
                  0]  # The color channel order in the original SSD is BGR, so we'll have the model reverse the color channel order of the input images.
-n_classes = 20  # Number of positive classes, e.g. 20 for Pascal VOC, 80 for MS COCO
+n_classes = 1  # Number of positive classes, e.g. 20 for Pascal VOC, 80 for MS COCO
 scales_pascal = [0.1, 0.2, 0.37, 0.54, 0.71, 0.88,
                  1.05]  # The anchor box scaling factors used in the original SSD300 for the Pascal VOC datasets
 scales_coco = [0.07, 0.15, 0.33, 0.51, 0.69, 0.87,
@@ -77,12 +83,37 @@ model = ssd_300(image_size=(img_height, img_width, img_channels),
                 subtract_mean=mean_color,
                 swap_channels=swap_channels)
 
-# weights_path = 'path/to/VGG_ILSVRC_16_layers_fc_reduced.h5'
-#
-# model.load_weights(weights_path, by_name=True)
+weights_path = 'VGG_VOC0712_SSD_300x300_ft_iter_120000.h5'
+
+
+classifier_names = ['conv4_3_norm_mbox_conf',
+                    'fc7_mbox_conf',
+                    'conv6_2_mbox_conf',
+                    'conv7_2_mbox_conf',
+                    'conv8_2_mbox_conf',
+                    'conv9_2_mbox_conf']
+
+
+f = h5py.File(weights_path, mode='r')
+if 'layer_names' not in f.attrs and 'model_weights' in f:
+    f = f['model_weights']
+
+layers = model.inner_model.layers if hasattr(model, "inner_model") \
+    else model.layers
+
+# Exclude some layers
+
+layers = filter(lambda l: l.name not in classifier_names, layers)
+
+
+topology.load_weights_from_hdf5_group_by_name(f, layers)
+
+if hasattr(f, 'close'):
+    f.close()
+
 
 sgd = SGD(lr=0.001, momentum=0.9, decay=0.0, nesterov=False)
-adam = Adam(lr=0.001)
+adam = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
 ssd_loss = SSDLoss(neg_pos_ratio=3, alpha=1.0)
 
 model.compile(optimizer=adam, loss=ssd_loss.compute_loss)
@@ -95,7 +126,7 @@ classes = ['background',
            'shit']
 
 train_dataset.parse_labelme(
-    annotations_dirs=['labeled'],
+    annotations_dirs=['/home/xiongxin/workspace/about_pig/img/2021-01-28'],
     classes=classes,
     include_classes='all',
     exclude_truncated=False,
@@ -103,7 +134,7 @@ train_dataset.parse_labelme(
     ret=False)
 
 val_dataset.parse_labelme(
-    annotations_dirs=['labeled'],
+    annotations_dirs=['/home/xiongxin/workspace/about_pig/img/25-26-27'],
     classes=classes,
     include_classes='all',
     exclude_truncated=False,
@@ -196,7 +227,7 @@ csv_logger = CSVLogger(filename='ssd300_pig_training_log.csv',
                        append=True)
 
 learning_rate_scheduler = LearningRateScheduler(schedule=lr_schedule,
-                                                verbose=1)
+                                            )
 
 terminate_on_nan = TerminateOnNaN()
 
@@ -207,7 +238,7 @@ callbacks = [model_checkpoint,
 
 initial_epoch = 0
 final_epoch = 120
-steps_per_epoch = 5
+steps_per_epoch = 50
 
 history = model.fit_generator(generator=train_generator,
                               steps_per_epoch=steps_per_epoch,
