@@ -16,6 +16,7 @@ from keras_layers.keras_layer_DecodeDetections import DecodeDetections
 from keras_layers.keras_layer_DecodeDetectionsFast import DecodeDetectionsFast
 from keras_layers.keras_layer_L2Normalization import L2Normalization
 from keras.engine import topology
+from keras.engine import saving
 
 from ssd_encoder_decoder.ssd_input_encoder import SSDInputEncoder
 from ssd_encoder_decoder.ssd_output_decoder import decode_detections, decode_detections_fast
@@ -106,7 +107,7 @@ layers = model.inner_model.layers if hasattr(model, "inner_model") \
 layers = filter(lambda l: l.name not in classifier_names, layers)
 
 
-topology.load_weights_from_hdf5_group_by_name(f, layers)
+saving.load_weights_from_hdf5_group_by_name(f, layers)
 
 if hasattr(f, 'close'):
     f.close()
